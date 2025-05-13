@@ -3,7 +3,9 @@
 #include <algorithm> // min函数的头文件
 #include <TFT_eSPI.h> // Graphics and font library for ST7735 driver chip
 uint32_t AS608Addr = 0XFFFFFFFF; //默认
-
+#define AS608_RXBUF_SIZE 256
+static uint8_t as608_rxbuf[AS608_RXBUF_SIZE];
+static uint16_t as608_rxlen = 0;
 extern void IRAM_ATTR onSerial1Data() ;
 
 extern uint8_t aRxBuffer[RXBUFFERSIZE];//接收缓冲
@@ -51,7 +53,19 @@ void displayOnTFT(const char* content, int x, int y, int width, int height); // 
 // 	}
 // }
 
-
+void AS608_SerialPoll() {
+    while (Serial1.available()) {
+		uint8_t data = Serial1.read();
+        if (as608_rxlen < AS608_RXBUF_SIZE) {
+            as608_rxbuf[as608_rxlen++] = data;
+        } else {
+            // 缓冲区满，丢弃最前面一个字节
+            memmove(as608_rxbuf, as608_rxbuf + 1, --as608_rxlen);
+            as608_rxbuf[as608_rxlen++] = Serial1.read();
+        }
+		//Serial.printf("AS608_SerialPoll received: 0x%02X\n", data);
+    }
+}
 //录指纹
 void Add_FR(void)
 {
@@ -300,77 +314,38 @@ static void SendCheck(uint16_t check)
 //waittime为等待中断接收数据的时间（单位1ms）
 //返回值：数据包首地址
 // extern uint8_t RX_len;//接收字节计数
-static uint8_t *JudgeStr(uint16_t waittime)
-{
-	char *data;
-	uint8_t str[8];
-	str[0]=0xef;
-	str[1]=0x01;
-	str[2]=AS608Addr>>24;
-	str[3]=AS608Addr>>16;
-	str[4]=AS608Addr>>8;
-	str[5]=AS608Addr;
-	str[6]=0x07;
-	str[7]='\0';
-	// RX_len = 0; // 清空接收字节计数
-	// memset(aRxBuffer, 0, sizeof(aRxBuffer));
-	// while(--waittime)
-	// {
-	// 	//UsartReceive_IDLE(); // 调用接收函数
-	// 	//vTaskDelay(pdMS_TO_TICKS(1)); // 延时1ms，避免过快的循环
-	// 	delay(1);
-    //     while (Serial1.available()) {
-    //         aRxBuffer[RX_len++] = Serial1.read();
-    //     }
-    //     if (RX_len) {
-    //         RX_len = 0;
-    //         data = strstr((const char *)aRxBuffer, (const char *)str);
-    //         if (data) {
-    //             return (uint8_t *)data;
-    //         }
-    //     }
-    // }\
+// static uint8_t *JudgeStr(uint16_t waittime)
+// {
+// 	char *data;
+// 	uint8_t str[8];
+// 	str[0]=0xef;
+// 	str[1]=0x01;
+// 	str[2]=AS608Addr>>24;
+// 	str[3]=AS608Addr>>16;
+// 	str[4]=AS608Addr>>8;
+// 	str[5]=AS608Addr;
+// 	str[6]=0x07;
+// 	str[7]='\0';
+// 	// RX_len = 0; // 清空接收字节计数
+// 	// memset(aRxBuffer, 0, sizeof(aRxBuffer));
+// 	// while(--waittime)
+// 	// {
+// 	// 	//UsartReceive_IDLE(); // 调用接收函数
+// 	// 	//vTaskDelay(pdMS_TO_TICKS(1)); // 延时1ms，避免过快的循环
+// 	// 	delay(1);
+//     //     while (Serial1.available()) {
+//     //         aRxBuffer[RX_len++] = Serial1.read();
+//     //     }
+//     //     if (RX_len) {
+//     //         RX_len = 0;
+//     //         data = strstr((const char *)aRxBuffer, (const char *)str);
+//     //         if (data) {
+//     //             return (uint8_t *)data;
+//     //         }
+//     //     }
+//     // }\
 	
-	//memset(aRxBuffer, 0, sizeof(aRxBuffer)); // 清空接收缓冲区
-    while (--waittime) {
-        vTaskDelay(pdMS_TO_TICKS(1)); // 延时1ms，避免过快的循环
-
-        while (Serial1.available()) {
-                aRxBuffer[RX_len++] = Serial1.read();
-        }
-
-        if (RX_len ) { // 检查是否接收到至少9字节的数据包
-            // 打印接收到的数据（调试用）
-            Serial.print("Received data: ");
-            for (int i = 0; i < RX_len; i++) {
-                Serial.printf("0x%02X ", aRxBuffer[i]);
-            }
-            Serial.println();
-			RX_len = 0; // 清空接收字节计数
-            data = strstr((const char *)aRxBuffer, (const char *)str);
-            if (data) {
-                return (uint8_t *)data;
-            }
-        }
-    }
-	Serial.println("没有接收到指纹数据包");
-	Serial1.onReceive(onSerial1Data); // 注册中断回调函数
-	return 0;
-}
-// static uint8_t *JudgeStr(uint16_t waittime) {
-//     char *data;
-//     uint8_t str[8];
-//     str[0] = 0xef;
-//     str[1] = 0x01;
-//     str[2] = AS608Addr >> 24;
-//     str[3] = AS608Addr >> 16;
-//     str[4] = AS608Addr >> 8;
-//     str[5] = AS608Addr;
-//     str[6] = 0x07;
-//     str[7] = '\0';
-
-
-
+// 	//memset(aRxBuffer, 0, sizeof(aRxBuffer)); // 清空接收缓冲区
 //     while (--waittime) {
 //         vTaskDelay(pdMS_TO_TICKS(1)); // 延时1ms，避免过快的循环
 
@@ -379,28 +354,64 @@ static uint8_t *JudgeStr(uint16_t waittime)
 //         }
 
 //         if (RX_len ) { // 检查是否接收到至少9字节的数据包
-//             // // 打印接收到的数据（调试用）
-//             // Serial.print("Received data: ");
-//             // for (int i = 0; i < RX_len; i++) {
-//             //     Serial.printf("0x%02X ", aRxBuffer[i]);
-//             // }
-//             // Serial.println();
-
-//             // 检查数据包是否完整
-//             if (aRxBuffer[0] == 0xEF && aRxBuffer[1] == 0x01) {
-//                 data = strstr((const char *)aRxBuffer, (const char *)str);
-//                 if (data) {
-// 					RX_len = 0; // 清空接收字节计数
-// 					// memset(aRxBuffer, 0, sizeof(aRxBuffer)); // 清空缓冲区
-//                     return (uint8_t *)data;
-//                 }
+//             // 打印接收到的数据（调试用）
+//             Serial.print("Received data: ");
+//             for (int i = 0; i < RX_len; i++) {
+//                 Serial.printf("0x%02X ", aRxBuffer[i]);
+//             }
+//             Serial.println();
+// 			RX_len = 0; // 清空接收字节计数
+//             data = strstr((const char *)aRxBuffer, (const char *)str);
+//             if (data) {
+//                 return (uint8_t *)data;
 //             }
 //         }
 //     }
-
-//     Serial.println("没有接收到指纹数据包");
-//     return 0;
+// 	Serial.println("没有接收到指纹数据包");
+// 	Serial1.onReceive(onSerial1Data); // 注册中断回调函数
+// 	return 0;
 // }
+static uint8_t *JudgeStr(uint16_t waittime)
+{
+    uint8_t str[7];
+    str[0]=0xef;
+    str[1]=0x01;
+    str[2]=AS608Addr>>24;
+    str[3]=AS608Addr>>16;
+    str[4]=AS608Addr>>8;
+    str[5]=AS608Addr;
+    str[6]=0x07;
+
+    while (--waittime) {
+        vTaskDelay(pdMS_TO_TICKS(1));
+        AS608_SerialPoll();
+
+        // 至少要有包头+长度字段
+        if (as608_rxlen >= 9) {
+            for (int i = 0; i <= as608_rxlen - 7; i++) {
+                if (memcmp(as608_rxbuf + i, str, 7) == 0) {
+                    // 包头后第7、8字节是包长度
+                    uint16_t packetLen = (as608_rxbuf[i+7] << 8) | as608_rxbuf[i+8];
+                    uint16_t totalLen = 9 + packetLen;
+                    if (as608_rxlen - i >= totalLen) {
+                        // 找到完整包
+                        // Serial.print("JudgeStr: 找到完整包: ");
+                        // for (int j = 0; j < totalLen; j++) {
+                        //     Serial.printf("0x%02X ", as608_rxbuf[i+j]);
+                        // }
+                        // Serial.println();
+                        // 可选：清空缓冲区
+                        as608_rxlen = 0;
+                        return as608_rxbuf + i;
+                    }
+                }
+            }
+        }
+    }
+    Serial.println("没有接收到指纹数据包");
+    return 0;
+}
+
 //录入图像 GZ_GetImage
 //功能:探测手指，探测到后录入指纹图像存于ImageBuffer。 
 //模块返回确认字
@@ -832,52 +843,74 @@ uint8_t GZ_ValidTempleteNum(uint16_t *ValidN)
 //与AS608握手 GZ_HandShake
 //参数: GZ_Addr地址指针
 //说明: 模块返新地址（正确地址）	
+// uint8_t GZ_HandShake(uint32_t *GZ_Addr)
+// {
+// 	SendHead();
+// 	SendAddr();
+// 	Com_SendData(0X01);
+// 	Com_SendData(0X00);
+// 	Com_SendData(0X00);	
+// 	//UsartReceive_IDLE() ; // 读取串口数据
+// 	vTaskDelay(pdMS_TO_TICKS(200)); // 
+// 	//delay(200);
+// 	if (RX_len) {
+		
+// 		if (RX_len >= 9) {
+// 			// 打印接收到的数据（调试用）
+// 			Serial.print("Received data: ");
+// 			for (int i = 0; i < RX_len; i++) {
+// 				Serial.printf("0x%02X ", aRxBuffer[i]);
+// 			}
+// 			Serial.println();
+			
+// 			}
+        
+//         if (aRxBuffer[0] == 0xEF && aRxBuffer[1] == 0x01 && aRxBuffer[6] == 0x07) {
+//             *GZ_Addr = (aRxBuffer[2] << 24) + (aRxBuffer[3] << 16)
+//                        + (aRxBuffer[4] << 8) + aRxBuffer[5];
+// 			RX_len = 0;		   
+//             return 1;
+//         }
+//     }
+//     return 0;
+
+// }
+//与AS608握手 GZ_HandShake
+//参数: GZ_Addr地址指针
+//说明: 模块返新地址（正确地址）	
 uint8_t GZ_HandShake(uint32_t *GZ_Addr)
 {
-	SendHead();
-	SendAddr();
-	Com_SendData(0X01);
-	Com_SendData(0X00);
-	Com_SendData(0X00);	
-	//UsartReceive_IDLE() ; // 读取串口数据
-	vTaskDelay(pdMS_TO_TICKS(200)); // 
-	//delay(200);
-	if (RX_len) {
-		
-		if (RX_len >= 9) {
-			// 打印接收到的数据（调试用）
-			Serial.print("Received data: ");
-			for (int i = 0; i < RX_len; i++) {
-				Serial.printf("0x%02X ", aRxBuffer[i]);
-			}
-			Serial.println();
-			
-			}
-        
-        if (aRxBuffer[0] == 0xEF && aRxBuffer[1] == 0x01 && aRxBuffer[6] == 0x07) {
-            *GZ_Addr = (aRxBuffer[2] << 24) + (aRxBuffer[3] << 16)
-                       + (aRxBuffer[4] << 8) + aRxBuffer[5];
-			RX_len = 0;		   
-            return 1;
+    SendHead();
+    SendAddr();
+    Com_SendData(0X01);
+    Com_SendData(0X00);
+    Com_SendData(0X00);
+
+    // 等待数据到来，最多200ms
+    uint16_t waittime = 200;
+    while (waittime--) {
+        vTaskDelay(pdMS_TO_TICKS(1));
+        AS608_SerialPoll();
+
+        if (as608_rxlen >= 9) {
+            // 打印接收到的数据（调试用）
+            Serial.print("Received data: ");
+            for (int i = 0; i < as608_rxlen; i++) {
+                Serial.printf("0x%02X ", as608_rxbuf[i]);
+            }
+            Serial.println();
+
+            // 判断是否为应答包
+            if (as608_rxbuf[0] == 0xEF && as608_rxbuf[1] == 0x01 && as608_rxbuf[6] == 0x07) {
+                *GZ_Addr = (as608_rxbuf[2] << 24) + (as608_rxbuf[3] << 16)
+                         + (as608_rxbuf[4] << 8) + as608_rxbuf[5];
+                as608_rxlen = 0;
+                return 1;
+            }
         }
     }
+    Serial.println("没有接收到握手应答包");
     return 0;
-	//UsartReceive(Serial1);
-	// if (RX_len)
-	// {
-	// 	RX_len = 0;
-	// 	if (aRxBuffer[0] == 0XEF &&  aRxBuffer[1] == 0X01 &&  aRxBuffer[6] == 0X07)
-	// 	//判断是不是模块返回的应答包	
-	// 	{
-	// 		*GZ_Addr = (aRxBuffer[2] << 24) + (aRxBuffer[3] << 16)
-	// 				 + (aRxBuffer[4] << 8)  + (aRxBuffer[5]);
-	// 		return 1;
-	// 	}
-	// }
-	// else
-	// {
-	// 	return 0; // 返回一个非1的值表示无数据
-	// }
 }
 //模块应答包确认码信息解析
 //功能：解析确认码错误信息返回信息
