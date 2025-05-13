@@ -1,3 +1,15 @@
 {
-    "cortex-debug.openocdPath": "C:\\software\\msys64\\mingw64\\bin\\openocd.EXE"
+    "cortex-debug.openocdPath": "C:\\software\\msys64\\mingw64\\bin\\openocd.EXE",
+    "files.associations": {
+        "*.m": "matlab",
+        "stdint.h": "c",
+        "string.h": "c",
+        "as608.h": "c",
+        "usart.h": "c",
+        "functional": "cpp",
+        "as608.c": "cpp",
+        "random": "cpp",
+        "limits": "cpp"
+    },
+    "git.ignoreLimitWarning": true
 }
