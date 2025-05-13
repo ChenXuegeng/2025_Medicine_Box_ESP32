@@ -54,8 +54,8 @@
 ////指纹模块引脚定义
 	SysPara AS608Para;//指纹模块AS608参数
 	// uint16_t ValidN;//模块内有效模板个数
-	uint8_t aRxBuffer[RXBUFFERSIZE];//接收缓冲
-	uint8_t RX_len;//接收字节计数
+	//uint8_t aRxBuffer[RXBUFFERSIZE];//接收缓冲
+	//uint8_t RX_len;//接收字节计数
 	extern uint8_t ID;//指纹ID
 	extern SearchResult seach;
 	extern uint8_t OK_; // 录入成功标志位
@@ -221,58 +221,58 @@ SemaphoreHandle_t xTftMutex;
 //     }
 // }
 
-extern QueueHandle_t xQueue;
+// extern QueueHandle_t xQueue;
 
-// 定义串口中断回调函数，用于指纹模块的串口接收
-void IRAM_ATTR onSerial1Data() {
-    static uint8_t tempBuffer[RXBUFFERSIZE];
-    static uint16_t tempLen = 0;
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+// // 定义串口中断回调函数，用于指纹模块的串口接收
+// void IRAM_ATTR onSerial1Data() {
+//     static uint8_t tempBuffer[RXBUFFERSIZE];
+//     static uint16_t tempLen = 0;
+//     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-    while (Serial1.available()) {
-        uint8_t data = Serial1.read();
-        if (tempLen < RXBUFFERSIZE) {
-            tempBuffer[tempLen++] = data;
-        }
+//     while (Serial1.available()) {
+//         uint8_t data = Serial1.read();
+//         if (tempLen < RXBUFFERSIZE) {
+//             tempBuffer[tempLen++] = data;
+//         }
 
-		// 包头同步：如果不是0xEF 0x01开头，丢弃前面数据
-        while (tempLen >= 2 && !(tempBuffer[0] == 0xEF && tempBuffer[1] == 0x01)) {
-            // 左移一位
-            memmove(tempBuffer, tempBuffer + 1, --tempLen);
-        }
-        // 检查是否接收到完整的数据包（以 0xEF 0x01 开头）
-        if (tempLen >= 9 && tempBuffer[0] == 0xEF && tempBuffer[1] == 0x01) {
-            uint16_t packetLength = (tempBuffer[7] << 8) | tempBuffer[8];
-            if (tempLen >= (9 + packetLength)) {
-                // 将完整包通过队列通知任务处理（这里只传递长度，数据用全局缓冲区）
-                memcpy(aRxBuffer, tempBuffer, 9 + packetLength);
-                RX_len = 9 + packetLength;
-                tempLen = 0;
-				                if (tempLen > 0) {
-                    memmove(tempBuffer, tempBuffer + RX_len, tempLen);
-                }
-                // 通知任务有新包到达
-                xQueueSendFromISR(xQueue, &RX_len, &xHigherPriorityTaskWoken);
-            }
-        }
-    }
-    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-}
+// 		// 包头同步：如果不是0xEF 0x01开头，丢弃前面数据
+//         while (tempLen >= 2 && !(tempBuffer[0] == 0xEF && tempBuffer[1] == 0x01)) {
+//             // 左移一位
+//             memmove(tempBuffer, tempBuffer + 1, --tempLen);
+//         }
+//         // 检查是否接收到完整的数据包（以 0xEF 0x01 开头）
+//         if (tempLen >= 9 && tempBuffer[0] == 0xEF && tempBuffer[1] == 0x01) {
+//             uint16_t packetLength = (tempBuffer[7] << 8) | tempBuffer[8];
+//             if (tempLen >= (9 + packetLength)) {
+//                 // 将完整包通过队列通知任务处理（这里只传递长度，数据用全局缓冲区）
+//                 memcpy(aRxBuffer, tempBuffer, 9 + packetLength);
+//                 RX_len = 9 + packetLength;
+//                 tempLen = 0;
+// 				                if (tempLen > 0) {
+//                     memmove(tempBuffer, tempBuffer + RX_len, tempLen);
+//                 }
+//                 // 通知任务有新包到达
+//                 xQueueSendFromISR(xQueue, &RX_len, &xHigherPriorityTaskWoken);
+//             }
+//         }
+//     }
+//     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+// }
 
-// 任务中处理完整包
-void processSerialDataTask(void *pvParameters) {
-    uint8_t packetLen;
-    while (1) {
-        if (xQueueReceive(xQueue, &packetLen, portMAX_DELAY)) {
-            Serial.print("处理接收到的完整包: ");
-            for (int i = 0; i < packetLen; i++) {
-                Serial.printf("0x%02X ", aRxBuffer[i]);
-            }
-            Serial.println();
-            // 这里可以调用你的指纹包解析函数
-        }
-    }
-}
+// // 任务中处理完整包
+// void processSerialDataTask(void *pvParameters) {
+//     uint8_t packetLen;
+//     while (1) {
+//         if (xQueueReceive(xQueue, &packetLen, portMAX_DELAY)) {
+//             Serial.print("处理接收到的完整包: ");
+//             for (int i = 0; i < packetLen; i++) {
+//                 Serial.printf("0x%02X ", aRxBuffer[i]);
+//             }
+//             Serial.println();
+//             // 这里可以调用你的指纹包解析函数
+//         }
+//     }
+// }
 
 
 
@@ -430,14 +430,13 @@ void Medicine_task(void *pvParam) {
 		uint16_t time_current = timeinfo.tm_hour * 3600 + timeinfo.tm_min * 60 + timeinfo.tm_sec; // 当前时间的秒数
 		uint16_t time_target = targetHour * 3600 + targetMinute * 60 + targetSecond; // 目标时间的秒数
 
-		// 检查是否到达服药时间前20秒
-		if (time_current == time_target - 20) {
+		if (time_current == time_target - 20) {// 检查是否到达服药时间前20秒
 			Serial.println("到达吃药时间前20秒,触发加热");
 			setGPIOHigh(HEATER_PIN); // 设置加热引脚为高电平
 			JR = 1;
 		}
-		// 检查是否到达服药时间前10秒
-		if (time_current == time_target - 10) {
+		
+		if (time_current == time_target - 10) {// 检查是否到达服药时间前10秒
 			Serial.println("到达吃药时间前10秒,停止加热，触发抽水");
 			setGPIOLow(HEATER_PIN); // 设置加热引脚为低电平
 			setGPIOHigh(WATER_PIN); // 设置制冷引脚为高电平
@@ -445,15 +444,14 @@ void Medicine_task(void *pvParam) {
 			setGPIOLow(WATER_PIN); // 设置制冷引脚为低电平
 		}
 
-		// 检查是否到达服药时间
-		if (timeinfo.tm_hour == targetHour &&
+		if (timeinfo.tm_hour == targetHour &&// 检查是否到达服药时间
 			timeinfo.tm_min == targetMinute &&
 			timeinfo.tm_sec == targetSecond &&
 			lastExecutedSecond != timeinfo.tm_sec) {
-
 			lastExecutedSecond = timeinfo.tm_sec; // 更新上一次执行的秒数
 			Serial.println("到达吃药时间");
-
+			
+			finished = 0; // 重置人数
 			if (xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
 				tft.fillRect(0, 0, tft.width(), tft.height() - 60, TFT_GREY); // 填充背景色，保留底部三行
 				tft.setCursor(0, 0); // 设置光标位置
@@ -467,15 +465,15 @@ void Medicine_task(void *pvParam) {
 			vTaskSuspend(Environment_TaskHandle); // 暂停环境监测任务
 			vTaskSuspend(Emergency_TaskHandle); // 暂停紧急任务
 
-			
 			bool user1Done = false, user2Done = false;
-
-			while (finished < peopleNum) {
 				Serial.println("请刷指纹");
+			while (finished < peopleNum) {
+				Serial.printf("finished = %d\n", finished);
+
 				uint8_t a = press_FR(); // 刷指纹
 
-				if ((a == 1) && (ID == 1) && !user1Done) {
-					Serial.println("用户1匹配成功，投药动作");
+				if ((a == 1) && (seach.pageID+1 == 1) && !user1Done) {
+					Serial.println("用户1匹配成功,投药动作");
 					int maxDose = max(user1box1Dose, max(user1box2Dose, user1box5Dose));
 					for (int i = 0; i < maxDose; i++) {
 						if (i < user1box1Dose) {
@@ -507,12 +505,12 @@ void Medicine_task(void *pvParam) {
 					pwm.setPWM(0, 0, 280);
 					pwm.setPWM(1, 0, 280);
 					user1Done = true;
-					finished++;
+					finished+=1;
 					Serial.println("用户1投药完成");
 					vTaskDelay(pdMS_TO_TICKS(500));
 					continue;
-				} else if ((a == 1) && (ID == 2) && !user2Done) {
-					Serial.println("用户2匹配成功，投药动作");
+				} else if ((a == 1) && (seach.pageID+1 == 2) && !user2Done) {
+					Serial.println("用户2匹配成功,投药动作");
 					int maxDose = max(user2box1Dose, max(user2box2Dose, user2box5Dose));
 					for (int i = 0; i < maxDose; i++) {
 						if (i < user2box1Dose) {
@@ -543,7 +541,7 @@ void Medicine_task(void *pvParam) {
 					pwm.setPWM(0, 0, 280);
 					pwm.setPWM(1, 0, 280);
 					user2Done = true;
-					finished++;
+					finished  +=1;
 					Serial.println("用户2投药完成");
 					vTaskDelay(pdMS_TO_TICKS(500));
 					continue;
@@ -716,7 +714,7 @@ void setup(void) {
 	dht.begin();
 /////// 指纹模块的串口初始化。Serial1
     Serial1.begin(57600, SERIAL_8N1, 18, 17);  //RX=GPIO18，TX=GPIO17
-	Serial1.onReceive(onSerial1Data); // 注册中断回调函数
+	// Serial1.onReceive(onSerial1Data); // 注册中断回调函数
 	Serial.println("指纹模块串口初始化成功.");
 	GZ_Empty(); // 清空指纹模块的缓存
 	//tft_printf(0, 0, "指纹模块初始化成功.");
@@ -1023,12 +1021,12 @@ void handleUserTopic(byte* payload, unsigned int length) {
 	}
 
 	// 上电30秒内不处理user话题
-	if (millis() - startMillis < 10000) {
+	if (millis() - startMillis < 5000) {
 		Serial.println("millss: ");
 		Serial.println(millis());
 		Serial.println("startMillis: ");
 		Serial.println(startMillis);
-		Serial.println("上电15秒内，忽略'user'话题消息。");
+		Serial.println("上电10秒内，忽略'user'话题消息。");
 		return;
 	}
 
