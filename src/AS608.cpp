@@ -21,31 +21,6 @@ void displayOnTFT(const char* content, int x, int y, int width, int height); // 
 	uint16_t storageID = 0; // 存储指纹ID
 	uint16_t OK_ = 0; // 录入成功标志位
 
-// uint16_t i=0;//接收数据标志
-// void UsartReceive(HardwareSerial &serial) {
-// 	static size_t lastLength = 0;
-// 	size_t availableBytes = serial.available(); // 获取当前接收缓冲区中的字节数
-// 	if (availableBytes > 0) {
-// 		size_t bytesToRead = std::min(availableBytes, RXBUFFERSIZE - lastLength); // 确保不会超出缓冲区大小
-// 		serial.readBytes(aRxBuffer + lastLength, bytesToRead); // 读取数据到缓冲区
-// 		lastLength += bytesToRead;
-// 		RX_len = lastLength; // 记录接收数据长度
-// 		if( RX_len > RXBUFFERSIZE) 
-// 			{
-// 				RX_len = RXBUFFERSIZE; // 确保不超过缓冲区大小
-// 			}
-// 		//lastLength = 0; 
-// 		// if (lastLength >= RXBUFFERSIZE) {
-// 		// 	// 缓冲区已满，处理数据
-// 		// 	RX_len = lastLength; // 记录接收数据长度
-// 		// 	if( RX_len > RXBUFFERSIZE) RX_len = RXBUFFERSIZE; // 确保不超过缓冲区大小
-// 		// 	lastLength = 0; 
-// 		// 	// 重置缓冲区计数
-// 		// }
-// 	}
-// }
-
-
 void AS608_SerialPoll() {
     while (Serial1.available()) {
 		uint8_t data = Serial1.read();
@@ -77,23 +52,6 @@ void Add_FR(void)
 	{
 		switch (processnum)
 		{
-			// case 0:
-			// 	i++;
-			// 	displayOnTFT("请按手指", 0, 32, tft.width(), 16); // 只清除并填充第二行
-			// 	Serial.println("请按手指");
-			// 	ensure=GZ_GetImage();
-			// 	if(ensure==0x00) 
-			// 	{
-			// 		ensure=GZ_GenChar(CharBuffer1);//生成特征
-			// 		Serial.println("生成特征成功");
-			// 		displayOnTFT("生成特征成功", 0, 48, tft.width(), 16); // 只清除并填充第三行
-			// 		if(ensure==0x00)
-			// 		{
-			// 			i=0;
-			// 			processnum=1;//跳到第二步						
-			// 		}			
-			// 	}						
-			// 	break;
 			case 0:
 				i++;
 				//displayOnTFT("请按手指", 0, 32, tft.width(), 16);
@@ -144,7 +102,6 @@ void Add_FR(void)
 					processnum=0;//跳回第一步		
 				}
 				//vTaskDelay(pdMS_TO_TICKS(1000)); // 延时后清除显示
-				//delay(1000);
 				break;
 
 			case 3:
@@ -154,18 +111,14 @@ void Add_FR(void)
 					processnum=4;//跳到第五步
 				}else {processnum=0;}
 				//vTaskDelay(pdMS_TO_TICKS(1000)); // 延时后清除显示
-				//delay(1000);
 				break;
 				
 			case 4:	
 				ensure=GZ_StoreChar(CharBuffer2,ID);//储存模板
 				if(ensure==0x00) 
 				{	
-					//displayOnTFT("录入成功", 0, 64, tft.width(), 16); // 只清除并填充第四行
 					Serial.printf("录入成功,模板编号：%d", ID+1);
 					GZ_ValidTempleteNum(&ValidN);//读库指纹个数
-						// Serial.print("当前指纹数量: ");
-						// Serial.println(ValidN); // 打印指纹数量
 						ID++;
 						OK_ = 1;
 					vTaskDelay(pdMS_TO_TICKS(1500)); // 延时后清除显示
@@ -174,13 +127,11 @@ void Add_FR(void)
 				break;				
 		}
 		vTaskDelay(pdMS_TO_TICKS(1000)); // 延时后清除显示
-		//delay(800);
 		if(i==10)//超过10次没有按手指则退出
 		{
 				 if (a<=0)
 				 {
 					Serial.println("录入超时");
-					//displayOnTFT("录入超时", 0, 64, tft.width(), 16); // 只清除并填充第四行
 				 	a=1;
 				 }
 			
@@ -191,7 +142,6 @@ void Add_FR(void)
 SearchResult seach;
 uint8_t press_FR(void) {
     uint8_t ensure;
-    //displayOnTFT("请按手指", 0, 16, tft.width(), 16); // 只清除并填充第一行
     ensure = GZ_GetImage();
     if (ensure == 0x00) { // 获取图像成功
         ensure = GZ_GenChar(CharBuffer1);
@@ -202,7 +152,6 @@ uint8_t press_FR(void) {
 				if(seach.mathscore>100)
 							{
 								Serial.printf("匹配成功，模板编号：%d，匹配分数：%d\n", seach.pageID+1, seach.mathscore);
-								//vTaskDelay(pdMS_TO_TICKS(1500));
 								return 1; // 匹配成功，返回 1
 							}else
 							{
@@ -218,48 +167,6 @@ uint8_t press_FR(void) {
         }
     }
 }
-// //刷指纹
-// void press_FR(void)
-// {
-// 	SearchResult seach;
-// 	uint8_t ensure;
-// 	char *str;
-	
-// 	displayOnTFT("请按手指", 0, 16, tft.width(), 16); // 只清除并填充第一行
-// 	//Serial.println("请按指纹");
-// 	ensure=GZ_GetImage();
-// 	if(ensure==0x00)//获取图像成功 
-// 	{	
-// 		ensure=GZ_GenChar(CharBuffer1);
-// 		if(ensure==0x00) //生成特征成功
-// 		{		
-// 			ensure=GZ_HighSpeedSearch(CharBuffer1,0,300,&seach);
-// 			if(ensure==0x00)//搜索成功
-// 			{	
-//           if(seach.mathscore>100)
-// 					{
-// 						displayOnTFT("匹配成功", 0, 80, tft.width(), 16); // 只清除并填充第五行
-// 						Serial.printf("匹配成功,目标编号：%d", seach.pageID+1);
-// 						//delay(20000);
-// 						vTaskDelay(pdMS_TO_TICKS(2000)); // 延时后清除显示
-// 						fingerOK = 1; //匹配成功标志位
-// 					}else
-// 					{
-// 						displayOnTFT("匹配失败", 0, 80, tft.width(), 16); // 只清除并填充第五行
-// 						Serial.println("匹配失败");
-// 					}
-
-// 			}else
-// 			{
-// 				displayOnTFT("匹配失败", 0, 80, tft.width(), 16); // 只清除并填充第五行
-// 				Serial.println("匹配失败");
-// 			}
-
-// 	  }
-// 	}
-		
-// }
-
 //串口发送一个字节
 static void Com_SendData(uint8_t data)
 {
@@ -303,67 +210,6 @@ static void SendCheck(uint16_t check)
 	Com_SendData(check);
 }
 
-//判断中断接收的数组有没有应答包
-//waittime为等待中断接收数据的时间（单位1ms）
-//返回值：数据包首地址
-// extern uint8_t RX_len;//接收字节计数
-// static uint8_t *JudgeStr(uint16_t waittime)
-// {
-// 	char *data;
-// 	uint8_t str[8];
-// 	str[0]=0xef;
-// 	str[1]=0x01;
-// 	str[2]=AS608Addr>>24;
-// 	str[3]=AS608Addr>>16;
-// 	str[4]=AS608Addr>>8;
-// 	str[5]=AS608Addr;
-// 	str[6]=0x07;
-// 	str[7]='\0';
-// 	// RX_len = 0; // 清空接收字节计数
-// 	// memset(aRxBuffer, 0, sizeof(aRxBuffer));
-// 	// while(--waittime)
-// 	// {
-// 	// 	//UsartReceive_IDLE(); // 调用接收函数
-// 	// 	//vTaskDelay(pdMS_TO_TICKS(1)); // 延时1ms，避免过快的循环
-// 	// 	delay(1);
-//     //     while (Serial1.available()) {
-//     //         aRxBuffer[RX_len++] = Serial1.read();
-//     //     }
-//     //     if (RX_len) {
-//     //         RX_len = 0;
-//     //         data = strstr((const char *)aRxBuffer, (const char *)str);
-//     //         if (data) {
-//     //             return (uint8_t *)data;
-//     //         }
-//     //     }
-//     // }\
-	
-// 	//memset(aRxBuffer, 0, sizeof(aRxBuffer)); // 清空接收缓冲区
-//     while (--waittime) {
-//         vTaskDelay(pdMS_TO_TICKS(1)); // 延时1ms，避免过快的循环
-
-//         while (Serial1.available()) {
-//                 aRxBuffer[RX_len++] = Serial1.read();
-//         }
-
-//         if (RX_len ) { // 检查是否接收到至少9字节的数据包
-//             // 打印接收到的数据（调试用）
-//             Serial.print("Received data: ");
-//             for (int i = 0; i < RX_len; i++) {
-//                 Serial.printf("0x%02X ", aRxBuffer[i]);
-//             }
-//             Serial.println();
-// 			RX_len = 0; // 清空接收字节计数
-//             data = strstr((const char *)aRxBuffer, (const char *)str);
-//             if (data) {
-//                 return (uint8_t *)data;
-//             }
-//         }
-//     }
-// 	Serial.println("没有接收到指纹数据包");
-// 	Serial1.onReceive(onSerial1Data); // 注册中断回调函数
-// 	return 0;
-// }
 static uint8_t *JudgeStr(uint16_t waittime)
 {
     uint8_t str[7];
@@ -833,41 +679,7 @@ uint8_t GZ_ValidTempleteNum(uint16_t *ValidN)
 	
 	return ensure;
 }
-//与AS608握手 GZ_HandShake
-//参数: GZ_Addr地址指针
-//说明: 模块返新地址（正确地址）	
-// uint8_t GZ_HandShake(uint32_t *GZ_Addr)
-// {
-// 	SendHead();
-// 	SendAddr();
-// 	Com_SendData(0X01);
-// 	Com_SendData(0X00);
-// 	Com_SendData(0X00);	
-// 	//UsartReceive_IDLE() ; // 读取串口数据
-// 	vTaskDelay(pdMS_TO_TICKS(200)); // 
-// 	//delay(200);
-// 	if (RX_len) {
-		
-// 		if (RX_len >= 9) {
-// 			// 打印接收到的数据（调试用）
-// 			Serial.print("Received data: ");
-// 			for (int i = 0; i < RX_len; i++) {
-// 				Serial.printf("0x%02X ", aRxBuffer[i]);
-// 			}
-// 			Serial.println();
-			
-// 			}
-        
-//         if (aRxBuffer[0] == 0xEF && aRxBuffer[1] == 0x01 && aRxBuffer[6] == 0x07) {
-//             *GZ_Addr = (aRxBuffer[2] << 24) + (aRxBuffer[3] << 16)
-//                        + (aRxBuffer[4] << 8) + aRxBuffer[5];
-// 			RX_len = 0;		   
-//             return 1;
-//         }
-//     }
-//     return 0;
 
-// }
 //与AS608握手 GZ_HandShake
 //参数: GZ_Addr地址指针
 //说明: 模块返新地址（正确地址）	

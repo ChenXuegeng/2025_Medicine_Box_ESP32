@@ -62,37 +62,6 @@ uint8_t *sim900a_check_cmd(const char *str) {
 
 
 
-// uint8_t sim900a_send_cmd(const char *cmd, const char *ack, uint16_t waittime) {
-//   RX_INDEX = 0; // 清空接收缓冲区
-//   memset(RX_BUFFER, 0, RX_BUFFER_SIZE);
-//   // 发送命令
-//   SIM900_SERIAL.println(cmd);
-//   Serial.print("发送命令: ");
-//   Serial.println(cmd);
-//   // 等待应答
-//   uint32_t start = millis();
-//   while (millis() - start < waittime * 10) {
-//     while (SIM900_SERIAL.available()) {
-//       char c = SIM900_SERIAL.read();
-//       if (RX_INDEX < RX_BUFFER_SIZE - 1) {
-//         RX_BUFFER[RX_INDEX++] = c;
-//       }
-//       RX_BUFFER[RX_INDEX] = '\0'; // 添加结束符
-//     }
-//     // 仅在接收缓冲区有内容时打印
-//     if (RX_INDEX > 0) {
-//       Serial.print("接收到的内容: ");
-//       Serial.println(RX_BUFFER);
-//     }
-//     if (sim900a_check_cmd(ack)) {
-//       Serial.println("接收到期望的应答");
-//       return 0; // 成功
-//     }
-//     delay(10);
-//   }
-//   Serial.println("等待应答超时！");
-//   return 1; // 超时失败
-// }
 
 void logReceivedContent(const char *content) {
   static String lastContent = ""; // 保存上一次的内容

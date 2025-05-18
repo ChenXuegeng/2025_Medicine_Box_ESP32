@@ -1,24 +1,19 @@
 #include <Arduino.h>
 #include "freertos/FreeRTOS.h"    
 #include "freertos/task.h"
-
 #include <TFT_eSPI.h> // Graphics and font library for ST7735 driver chip
 #include <SPI.h>
 #include <simsum20.h>
 #include <DHT.h>
-
 #include <usart.h>
-
  #include <Adafruit_PWMServoDriver.h>
  #include "Wire.h"
 #include "servo.h"
 #include <FastLED.h>
-
 #include <WiFi.h>
 #include <time.h>
 #include <esp_sleep.h>
 #include "esp_system.h"
-
 #include <PubSubClient.h>
 #include <Ticker.h>
 #include "AS608.h"
@@ -37,16 +32,15 @@
 	const long gmtOffset_sec = 8 * 3600; // 北京时间 GMT+8
 	const int daylightOffset_sec = 0;   // 无夏令时
 ////tft屏幕引脚定义
-	TFT_eSPI tft = TFT_eSPI();  // Invoke library, pins defined in User_Setup.h
-	#define TFT_GREY 0xBDF7
+	TFT_eSPI tft = TFT_eSPI();  
 	#define TFT_BLACK 0x0000
 ////PCA9685引脚定义
 	Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);  // 默认地址为 0x40
 	#define SDA_PIN 21  // ESP32 的默认 SDA 引脚
 	#define SCL_PIN 20  // ESP32 的默认 SCL 引脚
 ////温湿度传感器引脚定义
-	#define DHTPIN 8     // Digital pin connected to the DHT sensor
-	#define DHTTYPE DHT11   // DHT 11
+	#define DHTPIN 8     
+	#define DHTTYPE DHT11   
 	DHT dht(DHTPIN, DHTTYPE);
 //// 定义 RGB 灯的引脚和参数
 	#define LED_PIN     48      // 板载 RGB 灯的 GPIO 引脚
@@ -60,9 +54,6 @@
 	extern uint8_t ID;//指纹ID
 	extern SearchResult seach;
 	extern uint8_t OK_; // 录入成功标志位
-
-	//extern uint16_t user_id ; // 用户ID
-	//extern uint16_t fingerOK;
 ////压力传感器引脚定义
 	#define SENSOR1_PIN 2  // 出药处压力传感器引脚
 	#define SENSOR2_PIN 1  // 药仓处压力传感器引脚	
@@ -103,13 +94,10 @@ const char* willTopic = "die";                                               // 
 const char* willMsg = "esp8266 offline";  // 遗嘱主题信息
 const int willQos = 0;                    // 遗嘱QoS
 const int willRetain = false;             // 遗嘱保留
- 
 const int subQoS = 0;             // 客户端订阅主题时使用的QoS级别（截止2020-10-07，仅支持QoS = 1，不支持QoS = 2）
 const bool cleanSession = true;  // 清除会话（如QoS>0必须要设为false）
- 
 bool ledStatus = HIGH;
 
-// extern void connectWifi();
 extern void tickerCount();
 extern void connectMQTTserver();
 extern void receiveCallback(char* topic, byte* payload, unsigned int length);
@@ -137,124 +125,22 @@ uint8_t JR = 0; // 1表示加热器工作，0表示停止工作
 uint8_t ZL = 1; // 1表示制冷器工作，0表示停止工作
 uint8_t hum_;
 uint8_t temp_;
-//匹配成功标志位
-// 传感器数据结构体
 typedef struct {
     float temperature;
     float humidity;
     uint32_t pressure[4];
 } SensorData;	
-// 全局同步对象
-// EventGroupHandle_t xEventGroup = xEventGroupCreate();
-
 SemaphoreHandle_t xSerialMutex = xSemaphoreCreateMutex();
 SemaphoreHandle_t xTftMutex;
-
-// // 定义串口中断回调函数，用于指纹模块的串口接收
-// void IRAM_ATTR onSerial1Data() {
-// 	//Serial.println("串口中断接收数据");
-//     static uint8_t tempBuffer[RXBUFFERSIZE]; // 临时缓冲区
-//     static uint16_t tempLen = 0;            // 临时缓冲区长度
-
-//     while (Serial1.available()) {
-//         uint8_t data = Serial1.read();
-
-//         // 将数据存入临时缓冲区
-//         if (tempLen < RXBUFFERSIZE) {
-//             tempBuffer[tempLen++] = data;
-//         }
-
-//         // 检查是否接收到完整的数据包（以 0xEF 0x01 开头）
-//         if (tempLen >= 9 && tempBuffer[0] == 0xEF && tempBuffer[1] == 0x01) {
-//             uint16_t packetLength = (tempBuffer[7] << 8) | tempBuffer[8]; // 包长度字段
-//             if (tempLen >= (9 + packetLength)) { // 检查是否接收到完整包
-//                 // 将临时缓冲区的数据复制到全局缓冲区
-//                 memcpy(aRxBuffer, tempBuffer, 9 + packetLength);
-//                 RX_len = 9 + packetLength;
-//                 // 清空临时缓冲区
-//                 tempLen = 0;
-//                 // // 打印接收到的数据（调试用）
-//                  Serial.print("串口串口串口的中断Received data: ");
-//                  for (int i = 0; i < RX_len; i++) {
-//                      Serial.printf("0x%02X ", aRxBuffer[i]);
-//                  }
-//                  Serial.println();
-				
-//             }
-//         }
-//     }
-// }
-
-
-
-// extern QueueHandle_t xQueue;
-
-// // 定义串口中断回调函数，用于指纹模块的串口接收
-// void IRAM_ATTR onSerial1Data() {
-//     static uint8_t tempBuffer[RXBUFFERSIZE];
-//     static uint16_t tempLen = 0;
-//     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-//     while (Serial1.available()) {
-//         uint8_t data = Serial1.read();
-//         if (tempLen < RXBUFFERSIZE) {
-//             tempBuffer[tempLen++] = data;
-//         }
-// 		// 包头同步：如果不是0xEF 0x01开头，丢弃前面数据
-//         while (tempLen >= 2 && !(tempBuffer[0] == 0xEF && tempBuffer[1] == 0x01)) {
-//             // 左移一位
-//             memmove(tempBuffer, tempBuffer + 1, --tempLen);
-//         }
-//         // 检查是否接收到完整的数据包（以 0xEF 0x01 开头）
-//         if (tempLen >= 9 && tempBuffer[0] == 0xEF && tempBuffer[1] == 0x01) {
-//             uint16_t packetLength = (tempBuffer[7] << 8) | tempBuffer[8];
-//             if (tempLen >= (9 + packetLength)) {
-//                 // 将完整包通过队列通知任务处理（这里只传递长度，数据用全局缓冲区）
-//                 memcpy(aRxBuffer, tempBuffer, 9 + packetLength);
-//                 RX_len = 9 + packetLength;
-//                 tempLen = 0;
-// 				                if (tempLen > 0) {
-//                     memmove(tempBuffer, tempBuffer + RX_len, tempLen);
-//                 }
-//                 // 通知任务有新包到达
-//                 xQueueSendFromISR(xQueue, &RX_len, &xHigherPriorityTaskWoken);
-//             }
-//         }
-//     }
-//     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-// }
-// // 任务中处理完整包
-// void processSerialDataTask(void *pvParameters) {
-//     uint8_t packetLen;
-//     while (1) {
-//         if (xQueueReceive(xQueue, &packetLen, portMAX_DELAY)) {
-//             Serial.print("处理接收到的完整包: ");
-//             for (int i = 0; i < packetLen; i++) {
-//                 Serial.printf("0x%02X ", aRxBuffer[i]);
-//             }
-//             Serial.println();
-//             // 这里可以调用你的指纹包解析函数
-//         }
-//     }
-// }
-
 
 
 //tft屏幕打印函数
 void tft_printf(int line, int column, const char* format, ...) {
 	tft.fillScreen(TFT_BLACK); // 填充背景色
 	tft.setCursor(column, line); // 设置光标位置
-	//va_list args;
-	//va_start(args, format);
 	tft.printf(format); // 使用 vprintf 处理可变参数
-	//va_end(args);
 }
-// //tft屏幕打印函数，，横屏
-// void tft_printf(int line, int column, const char* format, ...) {
-// 	tft.fillScreen(TFT_BLACK); // 填充背景色
-// 	tft.setRotation(1); // 设置屏幕为横屏模式
-// 	tft.setCursor(column, line); // 设置光标位置
-// 	tft.printf(format); // 使用 printf 处理可变参数
-// }
+
 void displayOnTFT(const char* content, int x, int y, int width, int height) {
     if (xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
         tft.fillRect(x, y, width, height, TFT_BLACK); // 填充背景色
@@ -337,7 +223,6 @@ void DisplayTime_Task(void *pvParam) {
 		{
 			displayOnTFT("制冷:OFF", 0, 112, tft.width(), 16); // 只清除并填充第三行
 		}
-		//displayOnTFT("下次吃药时间", 0, 112, tft.width(), 16); // 只清除并填充第四行
 		if (xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
 			tft.fillRect(0, 20, tft.width(), 16, TFT_BLACK); // 清除第二行
 			tft.setCursor(0,20 ); // 设置光标到第二行
@@ -348,8 +233,6 @@ void DisplayTime_Task(void *pvParam) {
 }
 
 void message_task(void *pvParam) {
-		//displayOnTFT("进行信息录入", 0, 16, tft.width(), 16); // 只清除并填充第二行
-		
 		Serial.println("进行信息录入");
 		vTaskSuspend(connect_taskHandle); // 暂停连接任务
 		vTaskSuspend(DisplayTime_TaskHandle); // 暂停时间显示任务
@@ -368,12 +251,6 @@ void message_task(void *pvParam) {
 			Add_FR(); // 录入指纹
 			if (OK_ == 1)
 			{
-				// if(xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
-				// 	tft.fillRect(0, 1, tft.width(), 20, TFT_BLACK); // 清除顶部区域
-				// 	tft.setCursor(0, 1); // 设置光标到屏幕顶部
-				// 	tft.printf(" 指纹录入成功\n");
-				// 	xSemaphoreGive(xTftMutex);
-				// }
 				break; // 录入成功，跳出循环
 			}
 			
@@ -388,7 +265,6 @@ void message_task(void *pvParam) {
 		vTaskDelay(pdMS_TO_TICKS(1000)); 
 		JR = 0; // 重置加热器状态
 		vTaskDelete(NULL);
-	//press_FR(); // 刷指纹
 }
 
 uint16_t peopleNum = 0; // 初始化人数为0
@@ -425,9 +301,6 @@ void Medicine_task(void *pvParam) {/// 到达吃药时间，语音提醒任务
 		if (timeinfo.tm_hour == targetHour &&// 检查是否到达服药时间
 			timeinfo.tm_min == targetMinute &&
 			timeinfo.tm_sec == targetSecond ){
-			//&&
-			// lastExecutedSecond != timeinfo.tm_sec) {
-			// lastExecutedSecond = timeinfo.tm_sec; // 更新上一次执行的秒数
 			Serial.println("到达吃药时间");
 
 			setGPIOLow(GPIO_NUM_4);
@@ -545,12 +418,10 @@ void Medicine_task(void *pvParam) {/// 到达吃药时间，语音提醒任务
 				}
 			}
 			setGPIOHigh(GPIO_NUM_4); // 设置引脚为低电平
-
 			vTaskResume(connect_taskHandle); // 恢复连接任务
 			vTaskResume(DisplayTime_TaskHandle); // 恢复时间显示任务
 			vTaskResume(Environment_TaskHandle); // 恢复环境监测任务
 			vTaskResume(Emergency_TaskHandle); // 恢复紧急任务
-
 			vTaskDelay(pdMS_TO_TICKS(1000)); // 延时
 		}
 	}
@@ -561,15 +432,7 @@ void Environment_Task(void *pvParam) {
     while (1) {
 
         float temp = dht.readTemperature();// 采集温湿度数据
-        float hum = dht.readHumidity(); 
-		// if(hum > 60)
-		// {
-		// 	setGPIOHigh(COOLER_PIN); // 设置制冷引脚为高电平
-		// }
-		// else
-		// {
-		// 	setGPIOLow(COOLER_PIN); // 设置制冷引脚为低电平
-		// }        
+        float hum = dht.readHumidity();     
         long pressure1 = getPressValue(SENSOR1_PIN);// 检查药物存储仓的压力传感器值
         long pressure2 = getPressValue(SENSOR2_PIN);
 		if (xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
@@ -597,10 +460,6 @@ void Environment_Task(void *pvParam) {
 			
 			xSemaphoreGive(xTftMutex);
 		}
-		///Serial.printf("温度: %.2f°C 湿度: %.2f%%\n", temp, hum); // 打印到串口
-		//  Serial.printf("出药处压力传感器: %ld g\n", pressure1); // 打印到串口
-		// Serial.printf("药包处压力传感器: %ld g\n", pressure2); // 打印到串口
-
 		char messageBuffer[64];
 		snprintf(messageBuffer, sizeof(messageBuffer), "%.2f", hum);// 发布湿度数据
 		publishMQTTMessage_(pubTopic1, messageBuffer);
@@ -627,13 +486,6 @@ void Environment_Task(void *pvParam) {
 			hum_ = 0; // 重置湿度值
             Serial.println("请将药盒放置在适宜环境中");
 			if (xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
-				// tft.fillRect(0, tft.height() - 60, tft.width(), 40, TFT_BLACK); // 填充底部倒数第二和倒数第三行背景色
-				// tft.setCursor(0, tft.height() - 60); // 设置光标到倒数第三行
-				// tft.printf("温度: %.2f°C", temp); // 显示温度数据
-				// tft.setCursor(0, tft.height() - 40); // 设置光标到倒数第二行
-				// tft.printf("湿度: %.2f%%", hum); // 显示湿度数据
-				// xSemaphoreGive(xTftMutex);
-				
 				tft.fillRect(0, tft.height() - 80, tft.width(), 40, TFT_BLACK); // 填充底部倒数第三行背景色
 				tft.setCursor(0, tft.height() - 80); // 设置光标到倒数第三行
 				tft.printf("温度: %.2f°C", temp); // 显示温度数据
@@ -700,10 +552,6 @@ void setup(void) {
 	tft.fillScreen(TFT_BLACK); // 填充背景色
 	tft.setRotation(1); // 设置屏幕为横屏模式
 	tft.setTextColor(TFT_WHITE, TFT_BLACK); // 设置文字颜色和背景色
-	// tft.setTextSize(2); // 设置文字大小为2
-	// tft.setCursor(0, 0); // 设置光标位置
-	// tft.printf("初始化中 ...\n");
-	
 //////// 初始化串口用于调试
     Serial.begin(115200);
     Serial.println("Initializing Serial ...");
@@ -720,10 +568,8 @@ void setup(void) {
 	// Serial1.onReceive(onSerial1Data); // 注册中断回调函数
 	Serial.println("指纹模块串口初始化成功.");
 	GZ_Empty(); // 清空指纹模块的缓存
-	//tft_printf(0, 0, "指纹模块初始化成功.");
 /////// gsm模块的串口初始化，Serial2 
 	Serial2.begin(115200, SERIAL_8N1, 13, 14);	//RX=GPIO13，TX=GPIO14 
-	// uint8_t res = 1;
 	res = GSM_Dect();
  
 //////压力传感器引脚初始化
@@ -735,27 +581,14 @@ void setup(void) {
 		while (1);  // 停止程序
 	}
 	Serial.println("I2C初始化成功.");
-	// tft.setCursor(0, 32); // 设置光标位置
-	// tft.printf(" I2C初始化成功.");
 	// 扫描 I2C 总线
-	/////////////////////////////////////////////////////////////////scanI2C();
+	scanI2C();
 	// 初始化 PCA9685
 	pwm.begin();
 	pwm.write8(0x00, 0x01);  // 清除 SLEEP 位，启用 PWM 输出
 	pwm.setPWMFreq(50);  // 设置 PWM 频率为 50Hz
 	Serial.println("PCA9685已设置PWM频率为50HZ .");
 	Serial.println("PCA9685初始化成功.");
-	// tft.fillScreen(TFT_BLACK); // 填充背景色
-	//  tft.setCursor(0, 48); // 设置光标位置
-	//  tft.printf(" PCA9685初始化成功.");
-	//tft.printf(2, 0, "PCA9685初始化成功.");
-		// // 检查寄存器
-		// uint8_t mode1 = pwm.read8(0x00);  // MODE1 寄存器
-		// uint8_t prescale = pwm.read8(0xFE);  // PRESCALE 寄存器
-		// Serial.print("MODE1 register: 0x");
-		// Serial.println(mode1, HEX);
-		// Serial.print("PRESCALE register: 0x");
-		// Serial.println(prescale, HEX);
 ////////// 连接 Wi-Fi，设置时间
     WiFi.begin(ssid, password);
     Serial.print("正在连接 Wi-Fi");
@@ -768,20 +601,7 @@ void setup(void) {
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 	// 配置时间
 	struct tm timeinfo;
-	///////如果需要收到设置时间
-	// timeinfo.tm_year = 2025 - 1900 ; // 年份从 1900 开始
-	// timeinfo.tm_mon = 4 - 1 ;            // 4 月（从 0 开始计数）
-	// timeinfo.tm_mday = 22;          // 日期
-	// timeinfo.tm_hour = 12;          // 小时
-	// timeinfo.tm_min = 0;           // 分钟
-	// timeinfo.tm_sec = 0;            // 秒
-	// time_t t = mktime(&timeinfo);
-	// struct timeval now = { .tv_sec = t };
-	// 	Serial.printf("设置的时间戳: %ld\n", t);
-	//settimeofday(&now, NULL); // 设置系统时间
 	Serial.println("RTC 已初始化！");
-
-
 	ticker.attach(1, tickerCount);  // Ticker定时对象
 	//设置ESP8266工作模式为无线终端模式
 	WiFi.mode(WIFI_STA);
@@ -790,17 +610,6 @@ void setup(void) {
 	mqttClient.setCallback(receiveCallback);
 	// 连接MQTT服务器
 	connectMQTTserver();
-	// char* pubMessage;
-	// pubMessage = "{\"heart\":\"1\"}";
-
-	// // 实现ESP8266向主题发布信息
-	// if (mqttClient.publish(pubTopic, pubMessage)) {
-	//   Serial.println("Publish Topic:");
-	//   Serial.println(pubTopic);
-	//   Serial.println(pubMessage);
-	// } else {
-	//   Serial.println("Message Publish Failed.");connect_task
-	// }
 
 	  xTaskCreate(connect_task, "TickerTask", 4096, NULL, 2, &connect_taskHandle); // 创建 Ticker 任务
 	xTaskCreate(DisplayTime_Task, "DisplayTimeTask", 2048, NULL, 1, &DisplayTime_TaskHandle);
@@ -834,46 +643,18 @@ void connectMQTTserver() { // 连接MQTT服务器并订阅信息
 	if (mqttClient.connect(clientId, mqttUserName,
 						   mqttPassword, willTopic,
 						   willQos, willRetain, willMsg, cleanSession)) {
-	//   Serial.print("MQTT Server Connected. ClientId: ");
-	//   Serial.println(clientId);
-	//   Serial.print("MQTT Server: ");
-	//   Serial.println(mqttServer);
-	//   Serial.print("SubTopic: ");                                                                                                                                                                 
+        
 	  //subscribeTopic();  // 订阅指定主题
 	  subscribeTopic_(subTopic1); // 订阅用户信息话题
 	  subscribeTopic_(subTopic2); // 订阅用户信息话题
 	  subscribeTopic_(subTopic3); // 订阅用户信息话题
 	} else {
-	//   Serial.print("MQTT Server Connect Failed. Client State:");
-	//   Serial.println(mqttClient.state());
-	  //delay(5000);
 	  vTaskDelay(pdMS_TO_TICKS(5000)); // 延时5秒后重试连接
 	}
   }
    
   // 收到信息后的回调函数
 void receiveCallback(char* topic, byte* payload, unsigned int length) {
-	// Serial.print("Message Received [");
-	// Serial.print(topic);
-	// Serial.print("] ");
-	// for (int i = 0; i < length; i++) {
-	//   Serial.print((char)payload[i]);
-	// }
-	// Serial.println("");
-	// Serial.print("Message Length(Bytes) ");
-	// Serial.println(length);
-	// if ((char)payload[0] == '1') {  // 如果收到的信息以“1”为开始
-	//   ledStatus = LOW;
-	// } else {
-	//   ledStatus = HIGH;
-	// }
-	// pubMQTTmsg();
-
-	// Serial.printf("Message Received [%s]: ", topic);
-    // for (unsigned int i = 0; i < length; i++) {
-    //     Serial.print((char)payload[i]);
-    // }
-    // Serial.println();
 	if (strcmp(topic, "user") == 0) {
         // 处理 "user" 主题的消息
         handleUserTopic(payload, length);
@@ -884,11 +665,6 @@ void receiveCallback(char* topic, byte* payload, unsigned int length) {
         // 处理 "time" 主题的消息
         handleTimeTopic(payload, length);
     } else {
-		// Serial.printf("Topic: %s, Message: ", topic);
-		// for (unsigned int i = 0; i < length; i++) {
-		// 	Serial.print((char)payload[i]);
-		// }
-		// Serial.println();
         Serial.println("Unknown topic received.");
     }
 
@@ -948,11 +724,6 @@ void handleUserTopic(byte* payload, unsigned int length) {
 // 处理 "dose" 主题的消息
 void handleDoseTopic(byte* payload, unsigned int length) {
 	 Serial.println("处理 'dose' 话题...");
-	// Serial.print("Received 'dose' topic, message: ");
-	// for (unsigned int i = 0; i < length; i++) {
-	// 	Serial.print((char)payload[i]);
-	// }
-	// Serial.println();
 	char message[length + 1]; // 将 payload 转换为字符串
 	memcpy(message, payload, length);
 	message[length] = '\0';
@@ -1024,8 +795,6 @@ void handleTimeTopic(byte* payload, unsigned int length) {
   // 订阅指定主题
 void subscribeTopic() {
    
-	// 通过串口监视器输出是否成功订阅主题以及订阅的主题名称
-	// 请注意subscribe函数第二个参数数字为QoS级别。这里为QoS = 1
 	if (mqttClient.subscribe(subTopic, subQoS)) {
 	  Serial.print("Subscribed Topic: ");
 	  Serial.println(subTopic);
@@ -1035,7 +804,6 @@ void subscribeTopic() {
    
   }
    
-
 // 订阅指定主题
 void subscribeTopic_(const char* topic) {
 	// 通过串口监视器输出是否成功订阅主题以及订阅的主题名称
@@ -1052,20 +820,9 @@ void subscribeTopic_(const char* topic) {
 // 发布信息
 void pubMQTTmsg() {
 	const char* pubMessage;
-   
 	pubMessage = "{\"heart\":\"1\"}";
-	// char messageBuffer[128];
-	// snprintf(messageBuffer, sizeof(messageBuffer), 
-	// 		 "{\"temperature\":%.2f,\"humidity\":%.2f,\"pressure1\":%ld,\"pressure2\":%ld}", 
-	// 		 dht.readTemperature(), dht.readHumidity(), 
-	// 		 getPressValue(SENSOR1_PIN), getPressValue(SENSOR2_PIN));
-	// pubMessage = messageBuffer;
-   
 	// 实现ESP8266向主题发布信息
 	if (mqttClient.publish(pubTopic, pubMessage)) {
-	//   Serial.println("Publish Topic:");
-	//   Serial.println(pubTopic);
-	//   Serial.println(pubMessage);
 	} else {
 	  //Serial.println("Message Publish Failed.");
 	}
@@ -1075,23 +832,10 @@ void publishMQTTMessage_(const char* topic, const char* message) {
     if (mqttClient.publish(topic, message)) {
 		//Serial.printf("Publish Topic: %s  ;  Message: %s\n", topic, message);
     } else {
-        //Serial.println("Message Publish Failed.");
+
     }
 }
-
 
 void creatTask(){
 	xTaskCreate(message_task, "MessageTask", 6144, NULL, 3, &Message_TaskHandle);
 }
-//   // ESP8266连接wifi
-//   void connectWifi() {
-// 	WiFi.begin(ssid, password);
-// 	//等待WiFi连接,成功连接后输出成功信息
-// 	while (WiFi.status() != WL_CONNECTED) {
-// 	  delay(1000);
-// 	  Serial.print(".");
-// 	}
-// 	Serial.println("");
-// 	Serial.println("WiFi Connected!");
-// 	Serial.println("");
-//   }
