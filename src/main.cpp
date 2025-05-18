@@ -34,6 +34,7 @@
 ////tft屏幕引脚定义
 	TFT_eSPI tft = TFT_eSPI();  
 	#define TFT_BLACK 0x0000
+	#define TFT_BLACK 0x0000
 ////PCA9685引脚定义
 	Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);  // 默认地址为 0x40
 	#define SDA_PIN 21  // ESP32 的默认 SDA 引脚
@@ -251,6 +252,12 @@ void message_task(void *pvParam) {
 			Add_FR(); // 录入指纹
 			if (OK_ == 1)
 			{
+				// if(xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
+				// 	tft.fillRect(0, 1, tft.width(), 20, TFT_BLACK); // 清除顶部区域
+				// 	tft.setCursor(0, 1); // 设置光标到屏幕顶部
+				// 	tft.printf(" 指纹录入成功\n");
+				// 	xSemaphoreGive(xTftMutex);
+				// }
 				break; // 录入成功，跳出循环
 			}
 			
@@ -300,7 +307,10 @@ void Medicine_task(void *pvParam) {/// 到达吃药时间，语音提醒任务
 
 		if (timeinfo.tm_hour == targetHour &&// 检查是否到达服药时间
 			timeinfo.tm_min == targetMinute &&
-			timeinfo.tm_sec == targetSecond ){
+			timeinfo.tm_sec == targetSecond &&
+			lastExecutedSecond != timeinfo.tm_sec) {
+
+			lastExecutedSecond = timeinfo.tm_sec; // 更新上一次执行的秒数
 			Serial.println("到达吃药时间");
 
 			setGPIOLow(GPIO_NUM_4);
@@ -409,6 +419,7 @@ void Medicine_task(void *pvParam) {/// 到达吃药时间，语音提醒任务
 					pwm.setPWM(1, 0, 280);
 					user2Done = true;
 					finished  +=1;
+					finished  +=1;
 					Serial.println("用户2投药完成");
 					vTaskDelay(pdMS_TO_TICKS(500));
 					continue;
@@ -417,7 +428,7 @@ void Medicine_task(void *pvParam) {/// 到达吃药时间，语音提醒任务
 					vTaskDelay(pdMS_TO_TICKS(1000));
 				}
 			}
-			setGPIOHigh(GPIO_NUM_4); // 设置引脚为低电平
+
 			vTaskResume(connect_taskHandle); // 恢复连接任务
 			vTaskResume(DisplayTime_TaskHandle); // 恢复时间显示任务
 			vTaskResume(Environment_TaskHandle); // 恢复环境监测任务
@@ -432,7 +443,7 @@ void Environment_Task(void *pvParam) {
     while (1) {
 
         float temp = dht.readTemperature();// 采集温湿度数据
-        float hum = dht.readHumidity();     
+        float hum = dht.readHumidity();         
         long pressure1 = getPressValue(SENSOR1_PIN);// 检查药物存储仓的压力传感器值
         long pressure2 = getPressValue(SENSOR2_PIN);
 		if (xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
@@ -550,8 +561,13 @@ void setup(void) {
 	tft.loadFont(simsum20); //指定tft屏幕对象载入font_12字库
 	//tft.unloadFont(); //释放字库文件,节省资源
 	tft.fillScreen(TFT_BLACK); // 填充背景色
+	tft.fillScreen(TFT_BLACK); // 填充背景色
 	tft.setRotation(1); // 设置屏幕为横屏模式
 	tft.setTextColor(TFT_WHITE, TFT_BLACK); // 设置文字颜色和背景色
+	// tft.setTextSize(2); // 设置文字大小为2
+	// tft.setCursor(0, 0); // 设置光标位置
+	// tft.printf("初始化中 ...\n");
+	
 //////// 初始化串口用于调试
     Serial.begin(115200);
     Serial.println("Initializing Serial ...");
