@@ -25,10 +25,12 @@
 #include "ADC.h"
 #include "SIM800A.h"
 // ////Wi-Fi 配置
-	const char* ssid = "机器人学院A工作室_5G";
-	const char* password = "JQRXY2022";
+	// const char* ssid = "机器人学院A工作室_5G";
+	// const char* password = "JQRXY2022";
 	// const char* ssid = "Xiaomi13";
 	// const char* password = "07080910";
+	const char* ssid = "JGPRO";
+	const char* password = "07080910";
 	const char* mqttServer = "8.138.46.109";
 	// NTP 服务器配置
 	const char* ntpServer = "pool.ntp.org";
@@ -37,6 +39,7 @@
 ////tft屏幕引脚定义
 	TFT_eSPI tft = TFT_eSPI();  // Invoke library, pins defined in User_Setup.h
 	#define TFT_GREY 0xBDF7
+	#define TFT_BLACK 0x0000
 ////PCA9685引脚定义
 	Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);  // 默认地址为 0x40
 	#define SDA_PIN 21  // ESP32 的默认 SDA 引脚
@@ -54,8 +57,6 @@
 ////指纹模块引脚定义
 	SysPara AS608Para;//指纹模块AS608参数
 	// uint16_t ValidN;//模块内有效模板个数
-	//uint8_t aRxBuffer[RXBUFFERSIZE];//接收缓冲
-	//uint8_t RX_len;//接收字节计数
 	extern uint8_t ID;//指纹ID
 	extern SearchResult seach;
 	extern uint8_t OK_; // 录入成功标志位
@@ -125,8 +126,8 @@ uint32_t targetHour = 0; // 目标小时
 uint32_t targetMinute = 0; // 目标分钟
 uint32_t targetSecond = 0; // 目标秒数
 #define MIN_WEIGHT_THRESHOLD 12 // 最小重量阈值（克）
-#define MAX_TEMP 30.0 // 最大温度阈值（摄氏度）
-#define MAX_HUMIDITY 65.0 // 最大湿度阈值（百分比）
+#define MAX_TEMP 35.0 // 最大温度阈值（摄氏度）
+#define MAX_HUMIDITY 75.0 // 最大湿度阈值（百分比）
 
 uint8_t user1box1Dose,user1box2Dose,user1box3Dose,user1box4Dose = 0; // 用户1药盒的剂量
 uint8_t user2box1Dose,user2box2Dose,user2box3Dose,user2box4Dose = 0; // 用户2的剂量
@@ -186,41 +187,6 @@ SemaphoreHandle_t xTftMutex;
 
 
 
-// // 定义串口中断回调函数，用于指纹模块的串口接收
-// void IRAM_ATTR onSerial1Data() {
-// 	//Serial.println("串口中断接收数据");
-//     static uint8_t tempBuffer[RXBUFFERSIZE]; // 临时缓冲区
-//     static uint16_t tempLen = 0;            // 临时缓冲区长度
-
-//     while (Serial1.available()) {
-//         uint8_t data = Serial1.read();
-
-//         // 将数据存入临时缓冲区
-//         if (tempLen < RXBUFFERSIZE) {
-//             tempBuffer[tempLen++] = data;
-//         }
-
-//         // 检查是否接收到完整的数据包（以 0xEF 0x01 开头）
-//         if (tempLen >= 9 && tempBuffer[0] == 0xEF && tempBuffer[1] == 0x01) {
-//             uint16_t packetLength = (tempBuffer[7] << 8) | tempBuffer[8]; // 包长度字段
-//             if (tempLen >= (9 + packetLength)) { // 检查是否接收到完整包
-//                 // 将临时缓冲区的数据复制到全局缓冲区
-//                 memcpy(aRxBuffer, tempBuffer, 9 + packetLength);
-//                 RX_len = 9 + packetLength;
-//                 // 清空临时缓冲区
-//                 tempLen = 0;
-//                 // // 打印接收到的数据（调试用）
-//                  Serial.print("串口串口串口的中断Received data: ");
-//                  for (int i = 0; i < RX_len; i++) {
-//                      Serial.printf("0x%02X ", aRxBuffer[i]);
-//                  }
-//                  Serial.println();
-                
-//             }
-//         }
-//     }
-// }
-
 // extern QueueHandle_t xQueue;
 
 // // 定义串口中断回调函数，用于指纹模块的串口接收
@@ -228,13 +194,11 @@ SemaphoreHandle_t xTftMutex;
 //     static uint8_t tempBuffer[RXBUFFERSIZE];
 //     static uint16_t tempLen = 0;
 //     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
 //     while (Serial1.available()) {
 //         uint8_t data = Serial1.read();
 //         if (tempLen < RXBUFFERSIZE) {
 //             tempBuffer[tempLen++] = data;
 //         }
-
 // 		// 包头同步：如果不是0xEF 0x01开头，丢弃前面数据
 //         while (tempLen >= 2 && !(tempBuffer[0] == 0xEF && tempBuffer[1] == 0x01)) {
 //             // 左移一位
@@ -258,7 +222,6 @@ SemaphoreHandle_t xTftMutex;
 //     }
 //     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 // }
-
 // // 任务中处理完整包
 // void processSerialDataTask(void *pvParameters) {
 //     uint8_t packetLen;
@@ -278,7 +241,7 @@ SemaphoreHandle_t xTftMutex;
 
 //tft屏幕打印函数
 void tft_printf(int line, int column, const char* format, ...) {
-	tft.fillScreen(TFT_GREY); // 填充背景色
+	tft.fillScreen(TFT_BLACK); // 填充背景色
 	tft.setCursor(column, line); // 设置光标位置
 	//va_list args;
 	//va_start(args, format);
@@ -287,14 +250,14 @@ void tft_printf(int line, int column, const char* format, ...) {
 }
 // //tft屏幕打印函数，，横屏
 // void tft_printf(int line, int column, const char* format, ...) {
-// 	tft.fillScreen(TFT_GREY); // 填充背景色
+// 	tft.fillScreen(TFT_BLACK); // 填充背景色
 // 	tft.setRotation(1); // 设置屏幕为横屏模式
 // 	tft.setCursor(column, line); // 设置光标位置
 // 	tft.printf(format); // 使用 printf 处理可变参数
 // }
 void displayOnTFT(const char* content, int x, int y, int width, int height) {
     if (xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
-        tft.fillRect(x, y, width, height, TFT_GREY); // 填充背景色
+        tft.fillRect(x, y, width, height, TFT_BLACK); // 填充背景色
         tft.setCursor(x, y); // 设置光标位置
         tft.printf(content); // 显示内容
         xSemaphoreGive(xTftMutex);
@@ -324,6 +287,8 @@ void connect_task(void *pvParam) {
 			Serial.println("MQTT连接断开，尝试重新连接...");
 			connectMQTTserver();
 		  }
+		  else
+		  	Serial.println("MQTT正常连接");
 		  if (count == 3) {
 			//pubMQTTmsg();  // 每隔3秒钟发布一次信息
 			count = 0;
@@ -347,7 +312,7 @@ void DisplayTime_Task(void *pvParam) {
 			continue;
 		}
 		if(xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
-			tft.fillRect(0, 1, tft.width(), 20, TFT_GREY); // 清除顶部区域
+			tft.fillRect(0, 1, tft.width(), 20, TFT_BLACK); // 清除顶部区域
 			tft.setCursor(0, 1); // 设置光标到屏幕顶部
 			tft.printf("      %02d:%02d:%02d\n",
 				timeinfo.tm_hour,
@@ -374,7 +339,7 @@ void DisplayTime_Task(void *pvParam) {
 		}
 		//displayOnTFT("下次吃药时间", 0, 112, tft.width(), 16); // 只清除并填充第四行
 		if (xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
-			tft.fillRect(0, 20, tft.width(), 16, TFT_GREY); // 清除第二行
+			tft.fillRect(0, 20, tft.width(), 16, TFT_BLACK); // 清除第二行
 			tft.setCursor(0,20 ); // 设置光标到第二行
 			tft.printf("吃药时间%02d:%02d:%02d", targetHour, targetMinute, targetSecond); // 显示下次吃药时间
 			xSemaphoreGive(xTftMutex);
@@ -384,18 +349,31 @@ void DisplayTime_Task(void *pvParam) {
 
 void message_task(void *pvParam) {
 		//displayOnTFT("进行信息录入", 0, 16, tft.width(), 16); // 只清除并填充第二行
+		
 		Serial.println("进行信息录入");
 		vTaskSuspend(connect_taskHandle); // 暂停连接任务
 		vTaskSuspend(DisplayTime_TaskHandle); // 暂停时间显示任务
 		vTaskSuspend(Medicine_TaskHandle); // 暂停吃药任务
 		vTaskSuspend(Environment_TaskHandle); // 暂停环境监测任务
 		vTaskSuspend(Emergency_TaskHandle); // 暂停紧急任务
-	
+
+		if(xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
+			tft.fillRect(0, 0, tft.width(), 48, TFT_BLACK); // 清除第一、二、三行区域
+			tft.setCursor(0, 1); // 设置光标到第一行
+			tft.printf("   进行指纹录入");
+			xSemaphoreGive(xTftMutex);
+		}
 		while (1)
 		{
 			Add_FR(); // 录入指纹
 			if (OK_ == 1)
 			{
+				// if(xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
+				// 	tft.fillRect(0, 1, tft.width(), 20, TFT_BLACK); // 清除顶部区域
+				// 	tft.setCursor(0, 1); // 设置光标到屏幕顶部
+				// 	tft.printf(" 指纹录入成功\n");
+				// 	xSemaphoreGive(xTftMutex);
+				// }
 				break; // 录入成功，跳出循环
 			}
 			
@@ -415,8 +393,8 @@ void message_task(void *pvParam) {
 
 uint16_t peopleNum = 0; // 初始化人数为0
 uint16_t finished = 0;
-/// 到达吃药时间，语音提醒任务
-void Medicine_task(void *pvParam) {
+uint8_t CY_1 = 0; 
+void Medicine_task(void *pvParam) {/// 到达吃药时间，语音提醒任务
 	static int lastExecutedSecond = -1; // 记录上一次执行的秒数
 	while (1) {
 		// 获取当前时间
@@ -446,14 +424,16 @@ void Medicine_task(void *pvParam) {
 
 		if (timeinfo.tm_hour == targetHour &&// 检查是否到达服药时间
 			timeinfo.tm_min == targetMinute &&
-			timeinfo.tm_sec == targetSecond &&
-			lastExecutedSecond != timeinfo.tm_sec) {
-			lastExecutedSecond = timeinfo.tm_sec; // 更新上一次执行的秒数
+			timeinfo.tm_sec == targetSecond ){
+			//&&
+			// lastExecutedSecond != timeinfo.tm_sec) {
+			// lastExecutedSecond = timeinfo.tm_sec; // 更新上一次执行的秒数
 			Serial.println("到达吃药时间");
-			
+
+			setGPIOLow(GPIO_NUM_4);
 			finished = 0; // 重置人数
 			if (xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
-				tft.fillRect(0, 0, tft.width(), tft.height() - 60, TFT_GREY); // 填充背景色，保留底部三行
+				tft.fillRect(0, 0, tft.width(), tft.height() - 60, TFT_BLACK); // 填充背景色，保留底部三行
 				tft.setCursor(0, 0); // 设置光标位置
 				tft.printf("到达吃药时间 "); // 显示提示信息
 				xSemaphoreGive(xTftMutex);
@@ -466,6 +446,12 @@ void Medicine_task(void *pvParam) {
 			vTaskSuspend(Emergency_TaskHandle); // 暂停紧急任务
 
 			bool user1Done = false, user2Done = false;
+			    		if (xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
+							tft.fillRect(0, 20, tft.width(), 16, TFT_BLACK); // 清除第二行
+							tft.setCursor(0,20 ); // 设置光标到第二行
+							tft.printf("请刷指纹"); // 显示下次吃药时间
+							xSemaphoreGive(xTftMutex);
+							}
 				Serial.println("请刷指纹");
 			while (finished < peopleNum) {
 				Serial.printf("finished = %d\n", finished);
@@ -477,24 +463,31 @@ void Medicine_task(void *pvParam) {
 					int maxDose = max(user1box1Dose, max(user1box2Dose, user1box5Dose));
 					for (int i = 0; i < maxDose; i++) {
 						if (i < user1box1Dose) {
-							pwm.setPWM(2, 0, 210);
+							pwm.setPWM(2, 0, 200);
 							Serial.println("药盒1转动");
 							vTaskDelay(pdMS_TO_TICKS(640));
 						} else {
 							pwm.setPWM(2, 0, 280);
 						}
-						if (i < user1box2Dose) {
-							pwm.setPWM(3, 0, 210);
+						if (i < user1box2Dose) {					
+							pwm.setPWM(3, 0, 200);
 							Serial.println("药盒2转动");
 							vTaskDelay(pdMS_TO_TICKS(640));
 						} else {
 							pwm.setPWM(3, 0, 280);
 						}
 						if (i < user1box5Dose) {
+							if (CY_1 == 1)
+							{
+								vTaskDelay(pdMS_TO_TICKS(400));
+							}
 							pwm.setPWM(0, 0, 155);
 							pwm.setPWM(1, 0, 430);
 							Serial.println("药仓转动");
 							vTaskDelay(pdMS_TO_TICKS(640));
+							CY_1 = 1;
+							pwm.setPWM(0, 0, 280);
+							pwm.setPWM(1, 0, 280);
 						} else {
 							pwm.setPWM(0, 0, 280);
 							pwm.setPWM(1, 0, 280);
@@ -509,20 +502,21 @@ void Medicine_task(void *pvParam) {
 					Serial.println("用户1投药完成");
 					vTaskDelay(pdMS_TO_TICKS(500));
 					continue;
-				} else if ((a == 1) && (seach.pageID+1 == 2) && !user2Done) {
+				} 
+				else if ((a == 1) && (seach.pageID+1 == 2) && !user2Done) {
 					Serial.println("用户2匹配成功,投药动作");
 					int maxDose = max(user2box1Dose, max(user2box2Dose, user2box5Dose));
 					for (int i = 0; i < maxDose; i++) {
 						if (i < user2box1Dose) {
-							pwm.setPWM(2, 0, 410);
+							pwm.setPWM(2, 0, 200);
 							Serial.println("药盒1转动");
-							vTaskDelay(pdMS_TO_TICKS(640));
+							vTaskDelay(pdMS_TO_TICKS(980));
 						} else {
 							pwm.setPWM(2, 0, 280);
 						}
 						if (i < user2box2Dose) {
-							pwm.setPWM(3, 0, 410);
-							vTaskDelay(pdMS_TO_TICKS(640));
+							pwm.setPWM(3, 0, 200);
+							vTaskDelay(pdMS_TO_TICKS(980));
 						} else {
 							pwm.setPWM(3, 0, 280);
 						}
@@ -550,6 +544,7 @@ void Medicine_task(void *pvParam) {
 					vTaskDelay(pdMS_TO_TICKS(1000));
 				}
 			}
+			setGPIOHigh(GPIO_NUM_4); // 设置引脚为低电平
 
 			vTaskResume(connect_taskHandle); // 恢复连接任务
 			vTaskResume(DisplayTime_TaskHandle); // 恢复时间显示任务
@@ -566,11 +561,19 @@ void Environment_Task(void *pvParam) {
     while (1) {
 
         float temp = dht.readTemperature();// 采集温湿度数据
-        float hum = dht.readHumidity();         
+        float hum = dht.readHumidity(); 
+		// if(hum > 60)
+		// {
+		// 	setGPIOHigh(COOLER_PIN); // 设置制冷引脚为高电平
+		// }
+		// else
+		// {
+		// 	setGPIOLow(COOLER_PIN); // 设置制冷引脚为低电平
+		// }        
         long pressure1 = getPressValue(SENSOR1_PIN);// 检查药物存储仓的压力传感器值
         long pressure2 = getPressValue(SENSOR2_PIN);
 		if (xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
-			tft.fillRect(0, tft.height() - 80, tft.width(), 40, TFT_GREY); // 填充底部倒数第三行背景色
+			tft.fillRect(0, tft.height() - 80, tft.width(), 40, TFT_BLACK); // 填充底部倒数第三行背景色
 			tft.setCursor(0, tft.height() - 80); // 设置光标到倒数第三行
 			if (temp_ =1)
 			{
@@ -624,14 +627,14 @@ void Environment_Task(void *pvParam) {
 			hum_ = 0; // 重置湿度值
             Serial.println("请将药盒放置在适宜环境中");
 			if (xSemaphoreTake(xTftMutex, portMAX_DELAY)) {
-				// tft.fillRect(0, tft.height() - 60, tft.width(), 40, TFT_GREY); // 填充底部倒数第二和倒数第三行背景色
+				// tft.fillRect(0, tft.height() - 60, tft.width(), 40, TFT_BLACK); // 填充底部倒数第二和倒数第三行背景色
 				// tft.setCursor(0, tft.height() - 60); // 设置光标到倒数第三行
 				// tft.printf("温度: %.2f°C", temp); // 显示温度数据
 				// tft.setCursor(0, tft.height() - 40); // 设置光标到倒数第二行
 				// tft.printf("湿度: %.2f%%", hum); // 显示湿度数据
 				// xSemaphoreGive(xTftMutex);
 				
-				tft.fillRect(0, tft.height() - 80, tft.width(), 40, TFT_GREY); // 填充底部倒数第三行背景色
+				tft.fillRect(0, tft.height() - 80, tft.width(), 40, TFT_BLACK); // 填充底部倒数第三行背景色
 				tft.setCursor(0, tft.height() - 80); // 设置光标到倒数第三行
 				tft.printf("温度: %.2f°C", temp); // 显示温度数据
 				tft.setCursor(0, tft.height() - 60); // 设置光标到倒数第二行
@@ -688,15 +691,15 @@ void setup(void) {
 	setGPIOLow(HEATER_PIN); // 设置加热器引脚为低电平	
 	setGPIOLow(WATER_PIN); // 设置水泵引脚为低电平
 	setGPIOHigh(COOLER_PIN); // 设置制冷引脚为低电平
-	
+	setGPIOHigh(GPIO_NUM_4); 
 ////////初始化TFT屏幕
 	tft.init();
 	tft.setRotation(0); // 设置屏幕方向为短边
 	tft.loadFont(simsum20); //指定tft屏幕对象载入font_12字库
 	//tft.unloadFont(); //释放字库文件,节省资源
-	tft.fillScreen(TFT_GREY); // 填充背景色
+	tft.fillScreen(TFT_BLACK); // 填充背景色
 	tft.setRotation(1); // 设置屏幕为横屏模式
-	tft.setTextColor(TFT_WHITE, TFT_GREY); // 设置文字颜色和背景色
+	tft.setTextColor(TFT_WHITE, TFT_BLACK); // 设置文字颜色和背景色
 	// tft.setTextSize(2); // 设置文字大小为2
 	// tft.setCursor(0, 0); // 设置光标位置
 	// tft.printf("初始化中 ...\n");
@@ -742,7 +745,7 @@ void setup(void) {
 	pwm.setPWMFreq(50);  // 设置 PWM 频率为 50Hz
 	Serial.println("PCA9685已设置PWM频率为50HZ .");
 	Serial.println("PCA9685初始化成功.");
-	// tft.fillScreen(TFT_GREY); // 填充背景色
+	// tft.fillScreen(TFT_BLACK); // 填充背景色
 	//  tft.setCursor(0, 48); // 设置光标位置
 	//  tft.printf(" PCA9685初始化成功.");
 	//tft.printf(2, 0, "PCA9685初始化成功.");
@@ -799,10 +802,7 @@ void setup(void) {
 	//   Serial.println("Message Publish Failed.");connect_task
 	// }
 
-    // 创建任务	 
-	//xTaskCreate(message_task, "MessageTask", 6144, NULL, 3, &Message_TaskHandle);
-
-	  xTaskCreate(connect_task, "TickerTask", 4096, NULL, 1, &connect_taskHandle); // 创建 Ticker 任务
+	  xTaskCreate(connect_task, "TickerTask", 4096, NULL, 2, &connect_taskHandle); // 创建 Ticker 任务
 	xTaskCreate(DisplayTime_Task, "DisplayTimeTask", 2048, NULL, 1, &DisplayTime_TaskHandle);
 	  xTaskCreate(Environment_Task, "EnvironmentTask", 4096, NULL, 2, &Environment_TaskHandle);
       xTaskCreate(Medicine_task, "ReminderTask", 4096, NULL, 3, &Medicine_TaskHandle);
@@ -812,113 +812,6 @@ void setup(void) {
 
 
 void loop() {
-//////////实时时间
-	// // 获取当前时间
-	//  struct tm timeinfo;
-	//  if (!getLocalTime(&timeinfo)) {
-	//    Serial.println("无法获取时间");
-	//    return;
-	//  }
-	// // 打印当前时间
-	// Serial.printf("当前时间: %04d-%02d-%02d %02d:%02d:%02d\n",
-	// 	timeinfo.tm_year + 1900,
-	// 	timeinfo.tm_mon + 1,
-	// 	timeinfo.tm_mday,
-	// 	timeinfo.tm_hour,
-	// 	timeinfo.tm_min,
-	// 	timeinfo.tm_sec);
-	// delay(1000); // 每秒更新一次
-
-//////////TFT屏幕初始化
-	// static bool initialized = false;
-	// if (!initialized) {
-	// 	// 初始化 TFT 屏幕
-	// 	tft.init();
-	// 	tft.setRotation(0);
-	// 	tft.fillScreen(TFT_GREY);
-	// 	tft.setTextColor(TFT_GREEN, TFT_GREY);  // 设置文本颜色和背景颜色
-	// 	tft.setTextSize(2);
-	// 	initialized = true;
-	// }
-	// // 在屏幕第一行显示时间
-	// tft.fillRect(0, 0, tft.width(), 16, TFT_GREY); // 清除第一行
-	// tft.setCursor(0, 0);
-	// tft.printf("Time: %02d:%02d:%02d", 
-	// 					timeinfo.tm_hour, 
-	// 					timeinfo.tm_min, 
-	// 					timeinfo.tm_sec);
-    // delay(2000);
-
-//////////温湿度传感器
-	// float h = dht.readHumidity();
-	// float t = dht.readTemperature();
-	// float f = dht.readTemperature(true);
-	// if (isnan(h) || isnan(t) || isnan(f)) {
-	//   Serial.println(F("Failed to read from DHT sensor!"));
-	//   return;
-	// }
-	// float hif = dht.computeHeatIndex(f, h);  //华氏度温度 f 和湿度 h 的热指数值
-	// float hic = dht.computeHeatIndex(t, h, false);  //摄氏度温度 t 和湿度 h 的热指数值
-	// Serial.print(F("Humidity: "));
-	// Serial.print(h);
-	// Serial.print(F("%  Temperature: "));
-	// Serial.print(t);
-	// Serial.print(F("°C "));
-	// Serial.print(f);
-	// tft.fillScreen(TFT_GREY);
-	// tft.setCursor(0, 0);
-	// tft.printf("Humidity: %.2f%%\n", h);//显示湿度值
-	// tft.printf("Temp: %.2f°C\n", t);//显示摄氏温度值
-
-//////////压力传感器
-	// long pressureValue1 = getPressValue(SENSOR1_PIN); // 读取传感器1的值
-	// long pressureValue2 = getPressValue(SENSOR2_PIN); // 读取传感器2的值
-	// Serial.printf("Pressure Sensor 1: %ld g\n", pressureValue1);
-	// Serial.printf("Pressure Sensor 2: %ld g\n", pressureValue2);
-	// tft.fillScreen(TFT_GREY);
-	// tft.setCursor(0, 0);
-	// tft.printf("Pressure Sensor 1: %ld g\n", pressureValue1);//显示压力值
-	// tft.printf("Pressure Sensor 2: %ld g\n", pressureValue2);//显示压力值
-
-
-//////////指纹识别模块
-	//   while(1)//与AS608模块握手
-	//   {
-	// 	delay(1000);//等待1秒
-	// 	if(GZ_HandShake(&AS608Addr) == 1)
-	// 	{
-	// 		// tft.fillScreen(TFT_GREY);
-	// 		// tft.setCursor(0, 0);
-	// 		// tft.printf("AS608 Handshake right"); //握手成功
-	// 		Serial.println("AS608 Handshake right");
-	// 		delay(2000);
-	// 		break;
-	// 	}
-	// 	break;
-	//   }
-	//   delay(100);
-	//   GZ_ValidTempleteNum(&ValidN);//读库指纹个数
-	//   GZ_ReadSysPara(&AS608Para);  //读AS608模块参数 
-	//   delay(1000);
-	//   Add_FR();//录入指纹
-	//   delay(1000);
-	//   while(1)
-	//   {
-	//     press_FR();//刷指纹
-	//   }
-
-//////舵机驱动
-	// Serial.println("Rotating clockwise...");
-	// pwm.setPWM(0, 0, 410);  // 设置通道 0 为 2ms 脉宽（顺时针旋转）
-	// delay(1000);            // 旋转 1 秒
-	// // 停止舵机
-	// Serial.println("Stopping...");
-	// pwm.setPWM(0, 0, 280);  // 设置通道 0 为 1.5ms 脉宽（停止）
-	// delay(2000);             // 停止后延迟一段时间
-	// pwm.setPWM(1, 0, 410);  //其他通道设置为 2ms 脉宽（顺时针旋转）
-	// delay(1000);            // 旋转 1 秒
-	// pwm.setPWM(1, 0, 280);  // 设置通道 0 为 1.5ms 脉宽（停止）
-	// delay(2000);             // 停止后延迟一段时间
 
 }
 
@@ -1026,7 +919,7 @@ void handleUserTopic(byte* payload, unsigned int length) {
 		Serial.println(millis());
 		Serial.println("startMillis: ");
 		Serial.println(startMillis);
-		Serial.println("上电10秒内，忽略'user'话题消息。");
+		Serial.println("上电后10秒内,忽略'user'话题消息。");
 		return;
 	}
 

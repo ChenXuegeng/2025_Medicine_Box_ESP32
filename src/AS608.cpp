@@ -46,13 +46,6 @@ void displayOnTFT(const char* content, int x, int y, int width, int height); // 
 // }
 
 
-// // 串口接收中断模拟（轮询方式）
-// void UsartReceive_IDLE() {
-// 	while (Serial1.available()) {
-// 	  aRxBuffer[RX_len++] = Serial1.read();
-// 	}
-// }
-
 void AS608_SerialPoll() {
     while (Serial1.available()) {
 		uint8_t data = Serial1.read();
@@ -133,7 +126,7 @@ void Add_FR(void)
 					}
 					else
 					{
-						Serial.println("回0");
+						Serial.println("回0,录入重新开始");
 						processnum=0; // 重新开始
 					}
 				}	
